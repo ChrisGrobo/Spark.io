@@ -5,6 +5,9 @@ Sept/12/2014
 */
 
 // This #include statement was automatically added by the Spark IDE.
+#include "spark-plotly/spark-plotly.h"
+
+// This #include statement was automatically added by the Spark IDE.
 #include "MCP23008-I2C/MCP23008-I2C.h"
 
 // This #include statement was automatically added by the Spark IDE.
@@ -16,6 +19,10 @@ Sept/12/2014
 #define DHTTYPE DHT11		// DHT 11 
 //#define DHTTYPE DHT22		// DHT 22 (AM2302)
 //#define DHTTYPE DHT21		// DHT 21 (AM2301)
+
+#define DATA_POINTS 4
+
+
 
 // Connect pin 1 (on the left) of the sensor to +5V
 // Connect pin 2 of the sensor to whatever your DHTPIN is
@@ -31,6 +38,30 @@ Sept/12/2014
 // Connect pin #9 of the expander to ground (common ground)
 
 // Input #0 is on pin 10 so connect a button or switch from there to ground
+
+
+/*
+
+void loop() {
+
+    float val1;
+    float val2;
+    float val3;
+    float val4;
+    
+    // up to you to decide what these values represent and how they get initialized/updated.
+
+    unsigned long x = millis();
+
+    graph.plot(x, val1, data_point_tokens[0]);
+    graph.plot(x, val2, data_point_tokens[1]);
+    graph.plot(x, val3, data_point_tokens[2]);
+    graph.plot(x, val4, data_point_tokens[3]);
+
+}
+
+*/
+
 
 
 
@@ -49,6 +80,8 @@ double temp = 0;
 double hum = 0;
 double lux = 0.0;
 double luxRaw = 0.0;
+int moist0 = 0;
+int moist1 = 0;
 //double growCubeID = 0.0;
 int waterLevel = 0;
 static int state0 = 1;
@@ -61,11 +94,19 @@ DHT dht(DHTPIN, DHTTYPE); //Digital Pin 3
 Adafruit_MCP23008 mcp;
 Adafruit_MCP23008 mcp1;
 
+//ploty
+char* data_point_tokens[NUM_TOKENS] = {"token1", "token2", "token3","token4"};
+plotly graph = plotly("username", "secret", streaming_tokens, "streamname", DATA_POINTS);
 
 // This routine runs only once upon reset
 void setup() {
     
     int i = 0;
+    
+    //Graph Init
+    graph.init();
+    graph.fileopt = "extend";
+    graph.openStream(); 
     
     //Serial Setup
     //Serial.begin(9600);
@@ -85,11 +126,15 @@ void setup() {
     Spark.variable("hum", &hum, DOUBLE);
     Spark.variable("lux", &lux, DOUBLE);
     Spark.variable("water", &waterLevel, INT);
+    Spark.variable("moist0", &moist0, INT);
+    Spark.variable("moist1", &moist1, INT);
     //Spark.variable("growCubeID", &growCubeID, DOUBLE);
   
     //Pin type and direction setup
-    pinMode(luxSense, INPUT);
+    pinMode(luxSense, INPUT); //moisture sensors on I2C GPIO
     pinMode(waterLevelSense, INPUT);
+    mcp.pinMode(7, INPUT);
+    mcp1.pinMode(7, INPUT);
     pinMode (pump, OUTPUT);
     //for (i = 0; i <= 1; i++) pinMode(led[i], OUTPUT);
     //for (i = 0; i <= 1; i++) pinMode(valve[i], OUTPUT);
@@ -136,10 +181,14 @@ void loop() {
 	temp = dht.getTempCelcius();
 	delay(1000); //DHT11 has a physical read time of 1+ seconds, delay for 2 seconds
     lux = analogRead(luxSense); //luxRaw
+    moist0 = mcp.digitalRead(7);
+    moist1 = mcp1.digitalRead(7);
     //Return: 0 = dim, 1 = nominal, 2 = bright
     //lux = ((luxRaw * 3.3)/4095);
     waterLevel = digitalRead(waterLevelSense);
     
+    if (lux > 2000) lightOnControl("curl https://api.spark.io/v1/devices/54ff6e066667515146521267/lightOn -d access_token=53ad4a2adfa86468e2c4f491167525de82976595 -d params=l1");
+    else lightOffControl("curl https://api.spark.io/v1/devices/54ff6e066667515146521267/lightOn -d access_token=53ad4a2adfa86468e2c4f491167525de82976595 -d params=l1"); 
 }
 
   
