@@ -20,8 +20,11 @@ Sept/12/2014
 //#define DHTTYPE DHT22		// DHT 22 (AM2302)
 //#define DHTTYPE DHT21		// DHT 21 (AM2301)
 
-#define DATA_POINTS 4
+#include "math.h"
 
+#define FIVE_MINUTES (5*60*1000)
+#define FIFTY_SECONDS (50*1000)
+#define NUM_TOKENS 6
 
 
 // Connect pin 1 (on the left) of the sensor to +5V
@@ -40,31 +43,12 @@ Sept/12/2014
 // Input #0 is on pin 10 so connect a button or switch from there to ground
 
 
-/*
-
-void loop() {
-
-    float val1;
-    float val2;
-    float val3;
-    float val4;
-    
-    // up to you to decide what these values represent and how they get initialized/updated.
-
-    unsigned long x = millis();
-
-    graph.plot(x, val1, data_point_tokens[0]);
-    graph.plot(x, val2, data_point_tokens[1]);
-    graph.plot(x, val3, data_point_tokens[2]);
-    graph.plot(x, val4, data_point_tokens[3]);
-
-}
-
-*/
-
-
-
-
+    double Temp = 0.0;
+    double Humidity = 0.0;
+    double Light = 0.0;
+    double waterLvl= 0.0;
+    int Moisture0 = 0;
+    int Moisture1 = 0;
 
 //OUTPUT DEFINE
 int pump = D2;
@@ -94,19 +78,25 @@ DHT dht(DHTPIN, DHTTYPE); //Digital Pin 3
 Adafruit_MCP23008 mcp;
 Adafruit_MCP23008 mcp1;
 
+unsigned long lastloop = 0;
+unsigned long heartbeat = 0;
 //ploty
-char* data_point_tokens[NUM_TOKENS] = {"token1", "token2", "token3","token4"};
-plotly graph = plotly("username", "secret", streaming_tokens, "streamname", DATA_POINTS);
+char *streaming_tokens[NUM_TOKENS] = {"token1", "token2", "token3", "token4", "token5", "token6"};
+plotly graph = plotly("camlesom", "qcqdz8bm6l", streaming_tokens, "SparkGardenSensorValues", NUM_TOKENS);
 
 // This routine runs only once upon reset
 void setup() {
     
     int i = 0;
+
     
     //Graph Init
-    graph.init();
     graph.fileopt = "extend";
-    graph.openStream(); 
+    graph.log_level = 4;
+    graph.maxpoints = 288;
+    graph.init();
+    graph.openStream();
+    heartbeat = millis();
     
     //Serial Setup
     //Serial.begin(9600);
@@ -176,6 +166,7 @@ void setup() {
 /**************************MAIN LOOP*****************************/
 //Don't delay for more then 5 seconds
 void loop() {
+    unsigned long now = millis();
     hum = dht.getHumidity();
     delay(1000); //DHT11 has a physical read time of 1+ seconds, delay for 2 seconds
 	temp = dht.getTempCelcius();
@@ -189,6 +180,29 @@ void loop() {
     
     if (lux > 2000) lightOnControl("curl https://api.spark.io/v1/devices/54ff6e066667515146521267/lightOn -d access_token=53ad4a2adfa86468e2c4f491167525de82976595 -d params=l1");
     else lightOffControl("curl https://api.spark.io/v1/devices/54ff6e066667515146521267/lightOn -d access_token=53ad4a2adfa86468e2c4f491167525de82976595 -d params=l1"); 
+    
+    unsigned long x = millis();
+if((now-lastloop)> FIVE_MINUTES){
+    
+    Light=(double)lux;
+    Temp=(double)dht.getTempCelcius();
+    delay(1000);
+    Humidity=(double)dht.getHumidity();
+    Moisture0=mcp.digitalRead(7);
+    Moisture1=mcp1.digitalRead(7);
+    waterLevel=(double)digitalRead(waterLevelSense);
+    
+    graph.plot(x, (float)Humidity, streaming_tokens[0]);
+    graph.plot(x, (float)Temp, streaming_tokens[1]);
+    graph.plot(x, (float)Light, streaming_tokens[2]);
+    graph.plot(x, Moisture0, streaming_tokens[3]);
+    graph.plot(x, Moisture1, streaming_tokens[4]);
+    graph.plot(x, waterLevel, streaming_tokens[5]);
+    
+    lastloop=now;
+    }else if((now - heartbeat) > FIFTY_SECONDS){
+        heartbeat = now;
+    }
 }
 
   
